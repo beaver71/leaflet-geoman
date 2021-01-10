@@ -112,9 +112,8 @@ Draw.Circle = Draw.extend({
     this._map.off('click', this._placeCenterMarker, this);
     this._map.off('mousemove', this._syncHintMarker, this);
 
-    // remove helping layers
-    this._map.removeLayer(this._layerGroup);
-
+	// remove helping layers
+	this._map.removeLayer(this._layerGroup);
 
     // toggle the draw button of the Toolbar in case drawing mode got disabled without the button
     this._map.pm.Toolbar.toggleButton(this.toolbarButtonName, false);
@@ -143,6 +142,25 @@ Draw.Circle = Draw.extend({
     const secondLatLng = this._getNewDestinationOfHintMarker();
     // set coords for hintline from marker to last vertex of drawin polyline
     this._hintline.setLatLngs([latlng, secondLatLng]);
+		
+	// add measure tooltip to _hintline
+    if (this.options.measurement) {
+		var distance = this._map.distance(latlng, secondLatLng),
+			_txt = parseInt(distance/100)/10 + ' km';
+		if (this._hintline.getTooltip()==undefined) {
+		  this._hintline
+			.bindTooltip(_txt, {
+			  permanent: true,
+			  offset: L.point(0, 0),
+			  direction: 'bottom',
+			  opacity: 0.8,
+			})
+			.openTooltip();
+		} else {
+		  // update measure tooltip
+		  this._hintline.setTooltipContent(_txt).openTooltip();
+		}
+    }
   },
   _syncCircleRadius() {
     const A = this._centerMarker.getLatLng();
@@ -244,11 +262,23 @@ Draw.Circle = Draw.extend({
 
     const options = Object.assign({}, this.options.pathOptions, { radius });
 
-    // create the final circle layer
-    const circleLayer = L.circle(center, options);
-    this._setPane(circleLayer,'layerPane');
-    this._finishLayer(circleLayer);
-    circleLayer.addTo(this._map.pm._getContainingLayer());
+	// create the final circle layer
+	const circleLayer = L.circle(center, options);
+	this._setPane(circleLayer,'layerPane');
+	this._finishLayer(circleLayer);
+	
+	if (this.options.measurement=='keep') {
+		// group layer measurement + circle
+		var _grLayer = new L.LayerGroup();
+		_grLayer.addLayer(circleLayer);
+		this._layerGroup.removeLayer(this._hintline);
+		this._layerGroup.removeLayer(this._centerMarker);
+		_grLayer.addLayer(this._hintline);
+		_grLayer.addLayer(this._centerMarker);
+		_grLayer.addTo(this._map.pm._getContainingLayer());
+	} else {
+		circleLayer.addTo(this._map.pm._getContainingLayer());
+	}
 
     if(circleLayer.pm) {
       // create polygon around the circle border

@@ -59,6 +59,14 @@ Draw.Rectangle = Draw.extend({
         })
         .openTooltip();
     }
+	
+	if (this.options.measurement) {
+		// this is the hintline from the hint marker to the center marker
+		this._hintline = L.polyline([], this.options.hintlineStyle);
+		this._setPane(this._hintline,'layerPane');
+		this._hintline._pmTempLayer = true;
+		this._layerGroup.addLayer(this._hintline);
+	}
 
     // show the hintmarker if the option is set
     if (this.options.cursorMarker) {
@@ -229,6 +237,45 @@ Draw.Rectangle = Draw.extend({
         this._styleMarkers[index].setLatLng(unmarkedCorner);
       });
     }
+	
+	// add measure tooltip to rect
+    if (this.options.measurement) {
+		this._hintline.setLatLngs([A, B]);
+		
+		var distanceX = this._map.distance(A, {lat: A.lat, lng: B.lng}),
+			distanceY = this._map.distance(A, {lat: B.lat, lng: A.lng}),
+			distanceD = this._map.distance(A, B),
+			_txtX = 'X: ' + parseInt(distanceX/100)/10 + ' km',
+			_txtY = 'Y: ' + parseInt(distanceY/100)/10 + ' km',
+			_txt = parseInt(distanceD/100)/10 + ' km';
+		if (this._startMarker.getTooltip()==undefined) {
+		  this._startMarker
+			.bindTooltip(_txtX+', '+_txtY, {
+			  permanent: true,
+			  offset: L.point(0, 10),
+			  direction: 'bottom',
+			  opacity: 0.8,
+			})
+			.openTooltip();
+		} else {
+		  // update measure tooltip
+		  this._startMarker.setTooltipContent(_txtX+', '+_txtY).openTooltip();
+		}
+		if (this._hintline.getTooltip()==undefined) {
+		  this._hintline
+			.bindTooltip(_txt, {
+			  permanent: true,
+			  offset: L.point(0, 0),
+			  direction: 'bottom',
+			  opacity: 0.8,
+			})
+			.openTooltip();
+		} else {
+		  // update measure tooltip
+		  this._hintline.setTooltipContent(_txt).openTooltip();
+		}
+    }
+	
   },
   _findCorners() {
     const corners = this._layer.getBounds();
@@ -257,7 +304,19 @@ Draw.Rectangle = Draw.extend({
     const rectangleLayer = L.rectangle([A, B], this.options.pathOptions);
     this._setPane(rectangleLayer,'layerPane');
     this._finishLayer(rectangleLayer);
-    rectangleLayer.addTo(this._map.pm._getContainingLayer());
+	
+	if (this.options.measurement=='keep') {
+		// group layer measurement + rect
+		var _grLayer = new L.LayerGroup();
+		_grLayer.addLayer(rectangleLayer);
+		this._layerGroup.removeLayer(this._hintline);
+		this._layerGroup.removeLayer(this._startMarker);
+		_grLayer.addLayer(this._hintline);
+		_grLayer.addLayer(this._startMarker);
+		_grLayer.addTo(this._map.pm._getContainingLayer());
+	} else {
+		rectangleLayer.addTo(this._map.pm._getContainingLayer());
+	}
 
     // fire the pm:create event and pass shape and layer
     Utils._fireEvent(this._map,'pm:create', {

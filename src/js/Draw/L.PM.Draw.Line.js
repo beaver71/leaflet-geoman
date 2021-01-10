@@ -163,6 +163,31 @@ Draw.Line = Draw.extend({
         lastPolygonPoint,
         this._hintMarker.getLatLng(),
       ]);
+	  
+	  	// add measure tooltip to _hintline
+		if (this.options.measurement) {
+			if (polyPoints.length>0) {
+				this._hintline._dist = this._map.distance(lastPolygonPoint, this._hintMarker.getLatLng());
+				if (!this._hintline._totdist) this._hintline._totdist = 0;
+				console.log("_syncHintLine",this._hintline._totdist, this._hintline._dist)
+				var d = this._hintline._totdist + this._hintline._dist;
+				var _txt = parseInt(d/100)/10 + ' km';
+				if (this._hintline.getTooltip()==undefined) {
+				  this._hintline
+					.bindTooltip(_txt, {
+					  permanent: true,
+					  offset: L.point(0, 0),
+					  direction: 'bottom',
+					  opacity: 0.8,
+					})
+					.openTooltip();
+				} else {
+				  // update measure tooltip
+				  this._hintline.setTooltipContent(_txt).openTooltip();
+				}
+			}
+		}
+	  
     }
   },
   _syncHintMarker(e) {
@@ -260,6 +285,11 @@ Draw.Line = Draw.extend({
     this._setTooltipText();
 
     this._hintline.setLatLngs([latlng, latlng]);
+	
+	if (this.options.measurement) {
+		if (this._hintline._totdist!=undefined) this._hintline._totdist += this._hintline._dist;
+		console.log("_createVertex",this._hintline._totdist, this._hintline._dist)
+	}
 
     Utils._fireEvent(this._layer,'pm:vertexadded', {
       shape: this._shape,
@@ -318,7 +348,18 @@ Draw.Line = Draw.extend({
     const polylineLayer = L.polyline(coords, this.options.pathOptions);
     this._setPane(polylineLayer,'layerPane');
     this._finishLayer(polylineLayer);
-    polylineLayer.addTo(this._map.pm._getContainingLayer());
+	
+	if (this.options.measurement=='keep') {
+		// group layer measurement + polyline
+		var _grLayer = new L.LayerGroup();
+		_grLayer.addLayer(polylineLayer);
+		this._layerGroup.removeLayer(this._hintline);
+		_grLayer.addLayer(this._hintline);
+		_grLayer.addTo(this._map.pm._getContainingLayer());
+	} else {
+		polylineLayer.addTo(this._map.pm._getContainingLayer());
+	}
+	
 
     // fire the pm:create event and pass shape and layer
     Utils._fireEvent(this._map,'pm:create', {
